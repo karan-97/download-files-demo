@@ -3,7 +3,7 @@ import Axios from "axios";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { API_KEY } from "./constants";
 import { PdfDocument } from "./Movie";
-import jsonexport from "jsonexport";
+import zipcelx from "zipcelx";
 
 const years = [
   { value: "2010", text: "2010" },
@@ -37,88 +37,107 @@ export default function MovieList() {
     }
   };
 
-  const downloadCSVOrExcel = async (data, type = "csv") => {
-    let delimeter =
-      type === "excel" ? { rowDelimiter: ";" } : { rowDelimiter: "," };
-    jsonexport(data, delimeter, function (err, data) {
-      if (err) return console.error(err);
-      let pom = document.createElement("a");
-      const content = data;
-      let apppType =
-        type === "excel"
-          ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          : "text/csv;charset=utf-8;";
-      let extension = type === "excel" ? "xlsx" : "csv";
-      let blob = new Blob([content], { type: apppType });
-      let url = URL.createObjectURL(blob);
-      pom.href = url;
-      pom.setAttribute("download", `foo.${extension}`);
-      pom.click();
-      window.URL.revokeObjectURL(url);
-    });
+  const getTableText = (data, divider) => {
+    const columns = Object.keys(data[0]);
+    const th = `${columns.join(divider)}`;
+    const td = data
+      .map((item) => Object.values(item).join(`"${divider}"`))
+      .join('"\n"');
+    return `${th}\n"${td}"`;
+  };
+
+  const exportToCSV = (text, fileName) => {
+    const hiddenElement = document.createElement("a");
+    const date = new Date();
+    hiddenElement.href =
+      "data:text/plain;charset=utf-8," + encodeURIComponent(text);
+    hiddenElement.download = `${fileName}-${date.toISOString()}.csv`;
+    hiddenElement.click();
+  };
+
+  const handleExportToCSV = (data) => {
+    const text = getTableText(data, ",");
+    exportToCSV(text, "movie-list");
+  };
+
+  const handelExportToExcel = (data) => {
+    const headData = Object.keys(data[0]).map((col) => ({
+      value: col,
+      type: "string"
+    }));
+    const bodyData = data.map((item) =>
+      Object.values(item).map((value) => ({ value, type: typeof value }))
+    );
+    const config = {
+      filename: "movie-list",
+      sheet: { data: [headData, ...bodyData] }
+    };
+    zipcelx(config);
   };
 
   return (
-    <div className="container">
-      <h2>Best movies of the year</h2>
-      <label htmlFor="movies">Select Year</label>
-      <select id="movies" className="select" onChange={fetchMovie}>
-        <option defaultValue="" disabled>
-          Select your option
-        </option>
-        {years.map((year, index) => {
-          return (
-            <option key={index} value={year.value}>
-              {year.text}
-            </option>
-          );
-        })}
-      </select>
-      {show && (
-        <PDFDownloadLink
-          document={<PdfDocument data={movieDetails} />}
-          fileName="movielist.pdf"
-          style={{
-            textDecoration: "none",
-            padding: "10px",
-            color: "#4a4a4a",
-            backgroundColor: "#f2f2f2",
-            border: "1px solid #4a4a4a"
-          }}
-        >
-          {({ blob, url, loading, error }) =>
-            loading ? "Loading document..." : "Download Pdf"
-          }
-        </PDFDownloadLink>
-      )}
-      {show && (
-        <button
-          style={{
-            textDecoration: "none",
-            padding: "10px",
-            color: "#4a4a4a",
-            backgroundColor: "#f2f2f2",
-            border: "1px solid #4a4a4a"
-          }}
-          onClick={() => downloadCSVOrExcel(movieDetails)}
-        >
-          Download CSV
-        </button>
-      )}
-      {show && (
-        <button
-          style={{
-            textDecoration: "none",
-            padding: "10px",
-            color: "#4a4a4a",
-            backgroundColor: "#f2f2f2",
-            border: "1px solid #4a4a4a"
-          }}
-          onClick={() => downloadCSVOrExcel(movieDetails, "excel")}
-        >
-          Download Excel
-        </button>
-      )}
-    </div>
+    <>
+      <div className="container">
+        <h2>Best movies of the year</h2>
+        <label htmlFor="movies">Select Year</label>
+        <select id="movies" className="select" onChange={fetchMovie}>
+          <option defaultValue="" disabled>
+            Select your option
+          </option>
+          {years.map((year, index) => {
+            return (
+              <option key={index} value={year.value}>
+                {year.text}
+              </option>
+            );
+          })}
+        </select>
+        {show && (
+          <PDFDownloadLink
+            document={<PdfDocument data={movieDetails} />}
+            fileName="movielist.pdf"
+            style={{
+              textDecoration: "none",
+              padding: "10px",
+              color: "#4a4a4a",
+              backgroundColor: "#f2f2f2",
+              border: "1px solid #4a4a4a"
+            }}
+          >
+            {({ blob, url, loading, error }) =>
+              loading ? "Loading document..." : "Download Pdf"
+            }
+          </PDFDownloadLink>
+        )}
+        {show && (
+          <button
+            style={{
+              textDecoration: "none",
+              padding: "10px",
+              color: "#4a4a4a",
+              backgroundColor: "#f2f2f2",
+              border: "1px solid #4a4a4a"
+            }}
+            onClick={() => handleExportToCSV(movieDetails)}
+          >
+            Download CSV
+          </button>
+        )}
+        {show && (
+          <button
+            style={{
+              textDecoration: "none",
+              padding: "10px",
+              color: "#4a4a4a",
+              backgroundColor: "#f2f2f2",
+              border: "1px solid #4a4a4a"
+            }}
+            onClick={() => handelExportToExcel(movieDetails)}
+          >
+            Download Excel
+          </button>
+        )}
+      </div>
+    </>
   );
 }
